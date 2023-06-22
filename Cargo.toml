@@ -1,0 +1,8 @@
+[package]
+name = "bevy_ui9slice"
+version = "0.1.0"
+edition = "2021"
+license = "APACHE"
+
+[dependencies]
+bevy = "0.10.1"
