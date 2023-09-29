@@ -9,8 +9,8 @@ basic setup:
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(Ui9SlicePlugin)
-        .add_startup_system(setup)
+        .add_plugins(Ui9SlicePlugin)
+        .add_system(Startup, setup)
         .run()
 }
 
