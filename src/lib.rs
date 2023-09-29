@@ -23,13 +23,6 @@ impl Ui9Slice {
     }
 }
 
-#[derive(Bundle, Default)]
-pub struct Ui9SliceBundle {
-    #[bundle]
-    pub _b: NodeBundle,
-    pub slice: Ui9Slice,
-}
-
 #[derive(SystemSet, Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct Ui9SliceSet;
 
@@ -37,7 +30,7 @@ pub struct Ui9SlicePlugin;
 
 impl Plugin for Ui9SlicePlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(update_slices.in_set(Ui9SliceSet));
+        app.add_systems(Update, update_slices.in_set(Ui9SliceSet));
     }
 }
 
@@ -102,20 +95,20 @@ fn update_slices(
             ItemData {
                 grow: 0.0,
                 start: Val::Px(0.0),
-                end: Val::Undefined,
+                end: Val::Auto,
                 outer_size: Val::Px(top_px),
                 inner_size: Val::Px(image_size.y),
             },
             ItemData {
                 grow: 1.0,
                 start: Val::Percent(-100.0 * top_px / middle_height_px),
-                end: Val::Undefined,
+                end: Val::Auto,
                 outer_size: Val::Auto,
                 inner_size: Val::Percent(100.0 * image_size.y / middle_height_px),
             },
             ItemData {
                 grow: 0.0,
-                start: Val::Undefined,
+                start: Val::Auto,
                 end: Val::Px(0.0),
                 outer_size: Val::Px(bottom_px),
                 inner_size: Val::Px(image_size.y),
@@ -138,20 +131,20 @@ fn update_slices(
             ItemData {
                 grow: 0.0,
                 start: Val::Px(0.0),
-                end: Val::Undefined,
+                end: Val::Auto,
                 outer_size: Val::Px(left_px),
                 inner_size: Val::Px(image_size.x),
             },
             ItemData {
                 grow: 1.0,
                 start: Val::Percent(-100.0 * left_px / middle_width_px),
-                end: Val::Undefined,
+                end: Val::Auto,
                 outer_size: Val::Auto,
                 inner_size: Val::Percent(100.0 * image_size.x / middle_width_px),
             },
             ItemData {
                 grow: 0.0,
-                start: Val::Undefined,
+                start: Val::Auto,
                 end: Val::Px(0.0),
                 outer_size: Val::Px(right_px),
                 inner_size: Val::Px(image_size.x),
@@ -159,72 +152,94 @@ fn update_slices(
         ];
 
         // get or build tree
-        let Some(container) = maybe_children.and_then(|children| children.iter().find(|child| existing_slices.get(**child).is_ok())) else {
+        let Some(container) = maybe_children.and_then(|children| {
+            children
+                .iter()
+                .find(|child| existing_slices.get(**child).is_ok())
+        }) else {
             // build
-            commands.entity(ent).insert(SliceInitMarker).with_children(|c| {
-                // container
-                c.spawn((
-                    NodeBundle{
-                        style: Style {
-                            flex_direction: FlexDirection::Column,
-                            flex_grow: 1.0,
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                    SliceInitMarker
-                ))
+            commands
+                .entity(ent)
+                .insert(SliceInitMarker)
                 .with_children(|c| {
-                    // row
-                    for row in &row_data {
-                        c.spawn(NodeBundle{
+                    // container
+                    c.spawn((
+                        NodeBundle {
                             style: Style {
-                                flex_direction: FlexDirection::Row,
-                                flex_grow: row.grow,
+                                flex_direction: FlexDirection::Column,
+                                flex_grow: 1.0,
                                 ..Default::default()
                             },
                             ..Default::default()
-                        }).with_children(|r| {
-                            // column
-                            for col in &col_data {
-                                r.spawn(NodeBundle {
-                                    style: Style {
-                                        size: Size::new(col.outer_size, row.outer_size),
-                                        flex_grow: col.grow,
-                                        overflow: Overflow::Hidden,
-                                        ..Default::default()
-                                    },
+                        },
+                        SliceInitMarker,
+                    ))
+                    .with_children(|c| {
+                        // row
+                        for row in &row_data {
+                            c.spawn(NodeBundle {
+                                style: Style {
+                                    flex_direction: FlexDirection::Row,
+                                    flex_grow: row.grow,
                                     ..Default::default()
-                                })
-                                .with_children(|i| {
-                                    // image
-                                    i.spawn(ImageBundle{
+                                },
+                                ..Default::default()
+                            })
+                            .with_children(|r| {
+                                // column
+                                for col in &col_data {
+                                    r.spawn(NodeBundle {
                                         style: Style {
-                                            size: Size::new(col.inner_size, row.inner_size),
-                                            position: UiRect { left: col.start, top: row.start, right: col.end, bottom: row.end },
-                                            position_type: PositionType::Absolute,
+                                            width: col.outer_size,
+                                            height: row.outer_size,
+                                            flex_grow: col.grow,
+                                            overflow: Overflow::clip(),
                                             ..Default::default()
                                         },
-                                        image: UiImage { texture: slice.image.clone(), ..Default::default() },
                                         ..Default::default()
+                                    })
+                                    .with_children(|i| {
+                                        // image
+                                        i.spawn(ImageBundle {
+                                            style: Style {
+                                                width: col.inner_size,
+                                                height: row.inner_size,
+                                                left: col.start,
+                                                top: row.start,
+                                                right: col.end,
+                                                bottom: row.end,
+                                                position_type: PositionType::Absolute,
+                                                ..Default::default()
+                                            },
+                                            image: UiImage {
+                                                texture: slice.image.clone(),
+                                                ..Default::default()
+                                            },
+                                            ..Default::default()
+                                        });
                                     });
-                                });
-                            }
-                        });
-                    }
+                                }
+                            });
+                        }
+                    });
                 });
-            });
 
             continue;
         };
 
         // update existing sizes and images
-        let Ok(rows) = children_query.get_component::<Children>(*container).map(|children| children.iter().copied().collect::<Vec<_>>()) else {
+        let Ok(rows) = children_query
+            .get_component::<Children>(*container)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+        else {
             panic!("do not taunt happy fun 9slice");
         };
         assert_eq!(rows.len(), 3);
         for (row, row_ent) in row_data.iter().zip(rows.into_iter()) {
-            let Ok(cols) = children_query.get_component::<Children>(row_ent).map(|children| children.iter().copied().collect::<Vec<_>>()) else {
+            let Ok(cols) = children_query
+                .get_component::<Children>(row_ent)
+                .map(|children| children.iter().copied().collect::<Vec<_>>())
+            else {
                 panic!("do not taunt happy fun 9slice");
             };
             assert_eq!(cols.len(), 3);
@@ -235,7 +250,8 @@ fn update_slices(
                 };
                 assert_eq!(children.len(), 1);
 
-                outer_style.size = Size::new(col.outer_size, row.outer_size);
+                outer_style.width = col.outer_size;
+                outer_style.height = row.outer_size;
 
                 let image_ent = children[0];
                 if let Some(mut commands) = commands.get_entity(image_ent) {
@@ -247,13 +263,12 @@ fn update_slices(
                 let Ok(mut inner_style) = style_query.get_component_mut::<Style>(image_ent) else {
                     panic!("do not taunt happy fun 9slice");
                 };
-                inner_style.size = Size::new(col.inner_size, row.inner_size);
-                inner_style.position = UiRect {
-                    left: col.start,
-                    right: col.end,
-                    top: row.start,
-                    bottom: row.end,
-                };
+                inner_style.width = col.inner_size;
+                inner_style.height = row.inner_size;
+                inner_style.left = col.start;
+                inner_style.right = col.end;
+                inner_style.top = row.start;
+                inner_style.bottom = row.end;
             }
         }
     }

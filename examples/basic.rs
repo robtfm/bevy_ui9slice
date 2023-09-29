@@ -4,10 +4,10 @@ use bevy_ui9slice::{Ui9Slice, Ui9SlicePlugin};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(Ui9SlicePlugin)
-        .add_startup_system(setup)
-        .add_system(size)
-        .add_system(update)
+        .add_plugins(Ui9SlicePlugin)
+        .add_systems(Startup, setup)
+        .add_systems(Update, size)
+        .add_systems(Update, update)
         .run()
 }
 
@@ -28,9 +28,12 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn size(mut sz: Query<&mut Style, With<Marker>>, time: Res<Time>) {
-    let Ok(mut s) = sz.get_single_mut() else { return; };
+    let Ok(mut s) = sz.get_single_mut() else {
+        return;
+    };
     let (x, y) = time.elapsed_seconds().sin_cos();
-    s.size = Size::new(Val::Px(200.0 + x * 100.0), Val::Px(200.0 + y * 100.0));
+    s.width = Val::Px(200.0 + x * 100.0);
+    s.height = Val::Px(200.0 + y * 100.0);
 }
 
 fn update(

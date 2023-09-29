@@ -5,4 +5,4 @@ edition = "2021"
 license = "APACHE"
 
 [dependencies]
-bevy = "0.10.1"
+bevy = "0.11"
